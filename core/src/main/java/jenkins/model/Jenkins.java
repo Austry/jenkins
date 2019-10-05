@@ -453,6 +453,8 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
     private static Jenkins theInstance;
 
     private transient volatile boolean isQuietingDown;
+    @Nullable
+    private transient volatile String quietingReason;
     private transient volatile boolean terminating;
     @GuardedBy("Jenkins.class")
     private transient boolean cleanUpStarted;
@@ -2744,6 +2746,12 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
         return isQuietingDown;
     }
 
+    @Exported
+    @Nullable
+    public String getQuietingReason() {
+        return quietingReason;
+    }
+
     /**
      * Returns true if the container initiated the termination of the web application.
      */
@@ -3862,7 +3870,7 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
     @RequirePOST
     public synchronized HttpRedirect doQuietDown() {
         try {
-            return doQuietDown(false,0);
+            return doQuietDown(false, 0, null);
         } catch (IOException | InterruptedException e) {
             throw new AssertionError(); // impossible
         }
@@ -3873,12 +3881,16 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
      *
      * @param block Block until the system really quiets down and no builds are running
      * @param timeout If non-zero, only block up to the specified number of milliseconds
+     * @param reason Quiet reason that will be visible to user
      */
     @RequirePOST
-    public HttpRedirect doQuietDown(@QueryParameter boolean block, @QueryParameter int timeout) throws InterruptedException, IOException {
+    public HttpRedirect doQuietDown(@QueryParameter boolean block,
+                                    @QueryParameter int timeout,
+                                    @QueryParameter @Nullable String reason) throws InterruptedException, IOException {
         synchronized (this) {
             checkPermission(ADMINISTER);
             isQuietingDown = true;
+            quietingReason = reason;
         }
         if (block) {
             long waitUntil = timeout;
@@ -3899,6 +3911,7 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
     public synchronized HttpRedirect doCancelQuietDown() {
         checkPermission(ADMINISTER);
         isQuietingDown = false;
+        quietingReason = null;
         getQueue().scheduleMaintenance();
         return new HttpRedirect(".");
     }
@@ -4332,7 +4345,7 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
                     ACL.impersonate(ACL.SYSTEM);
 
                     // Wait 'til we have no active executors.
-                    doQuietDown(true, 0);
+                    doQuietDown(true, 0, null);
 
                     // Make sure isQuietingDown is still true.
                     if (isQuietingDown) {
@@ -4433,7 +4446,7 @@ public class Jenkins extends AbstractCIBase implements DirectlyModifiableTopLeve
                     LOGGER.info(String.format("Shutting down VM as requested by %s from %s",
                                                 exitUser, exitAddr));
                     // Wait 'til we have no active executors.
-                    doQuietDown(true, 0);
+                    doQuietDown(true, 0, null);
                     // Make sure isQuietingDown is still true.
                     if (isQuietingDown) {
                         cleanUp();
