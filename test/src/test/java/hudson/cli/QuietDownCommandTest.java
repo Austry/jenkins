@@ -116,7 +116,7 @@ public class QuietDownCommandTest {
                 .invokeWithArgs("-reason", TEST_REASON);
         assertThat(result, succeededSilently());
         assertJenkinsInQuietMode();
-        assertThat(j.jenkins.getQuietingReason(), equalTo(TEST_REASON));
+        assertThat(j.jenkins.getQuietDownReason(), equalTo(TEST_REASON));
     }
 
     @Test
@@ -135,7 +135,7 @@ public class QuietDownCommandTest {
                 .invokeWithArgs("-block", "-timeout", "0", "-reason", TEST_REASON);
         assertThat(result, succeededSilently());
         assertJenkinsInQuietMode();
-        assertThat(j.jenkins.getQuietingReason(), equalTo(TEST_REASON));
+        assertThat(j.jenkins.getQuietDownReason(), equalTo(TEST_REASON));
     }
 
     @Test
