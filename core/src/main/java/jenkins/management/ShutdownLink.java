@@ -27,13 +27,22 @@ package jenkins.management;
 import hudson.Extension;
 import hudson.model.ManagementLink;
 import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
 import org.jenkinsci.Symbol;
+import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.StaplerResponse;
+import org.kohsuke.stapler.verb.POST;
 
-/**
- * @author <a href="mailto:nicolas.deloof@gmail.com">Nicolas De Loof</a>
- */
-@Extension(ordinal = Integer.MIN_VALUE) @Symbol("shutDown")
+import javax.servlet.ServletException;
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+@Extension(ordinal = Integer.MIN_VALUE)
+@Symbol("prepareQuietDown")
 public class ShutdownLink extends ManagementLink {
+
+    private static final Logger LOGGER = Logger.getLogger(ShutdownLink.class.getName());
 
     @Override
     public String getIconFileName() {
@@ -51,11 +60,21 @@ public class ShutdownLink extends ManagementLink {
 
     @Override
     public String getUrlName() {
-        return Jenkins.get().isQuietingDown() ? "cancelQuietDown" : "quietDown";
+        return "prepareQuietDown";
     }
 
-    @Override
-    public boolean getRequiresPOST() {
-        return true;
+    @POST
+    public synchronized void doPrepare(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException, InterruptedException {
+        JSONObject submittedForm = req.getSubmittedForm();
+        String inputReason = submittedForm.getString("quietReason");
+        String shutdownReason = inputReason.isEmpty() ? null : inputReason;
+        LOGGER.log(Level.FINE, "Quiet requested");
+        Jenkins.get().doQuietDown(false, 0, shutdownReason).generateResponse(req, rsp, null);
+    }
+
+    @POST
+    public synchronized void doCancel(StaplerRequest req, StaplerResponse rsp) throws IOException, ServletException {
+        LOGGER.log(Level.FINE, "Quiet cancel requested");
+        Jenkins.get().doCancelQuietDown().generateResponse(req, rsp, null);
     }
 }
